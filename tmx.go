@@ -46,9 +46,8 @@ var (
   templateNotLoaded      = errors.New("the template wasn't loaded")
 )
 
-// LoadTileMap reads in a tilemap from disk, sends
-// the data out to be processed, and finally returns
-// a tilemap instance.
+// LoadTileMap reads in a tilemap from disk, sends the data out to be 
+// processed, and finally returns a tilemap.
 func LoadTileMap(fp string) (m tilemap, e error) {
   // read in tile map from disk
   var b []byte
@@ -70,8 +69,7 @@ func LoadTileMap(fp string) (m tilemap, e error) {
   return
 }
 
-// loadTileset reads in a tileset from disk, and returns
-// a external tileset instance.
+// loadTileset reads in a tileset from disk, and returns a external tileset.
 func loadTileset(fp string) (ts external, e error) {
   // read in tile set from disk
   var b []byte
@@ -82,8 +80,7 @@ func loadTileset(fp string) (ts external, e error) {
   return
 }
 
-// loadTemplate reads in a template from disk, and returns
-// a external tileset instance.
+// loadTemplate reads in a template from disk, and returns an external tileset.
 func loadTemplate(fp string) (t template, e error) {
   // read in template from disk
   var b []byte
@@ -94,8 +91,8 @@ func loadTemplate(fp string) (t template, e error) {
   return
 }
 
-// getTemplates minimizes the numbers of reads from the disk by
-// calling load template only once for each template file.
+// getTemplates minimizes the numbers of reads from the disk by calling load 
+// template only once for each template file.
 func getTemplates(objs *[]object) (tmp map[string]template, e error) {
   tmp = make(map[string]template) 
   for i := 0; i < len(*(objs)); i++ {
@@ -112,8 +109,7 @@ func getTemplates(objs *[]object) (tmp map[string]template, e error) {
   return
 }
 
-// decodeCSV splits up the global ids and saves them 
-// into a byte array.
+// decodeCSV splits up the global ids and saves them  into a byte array.
 func decodeCSV(d *interface{}) (e error) {
   // make sure the underlying data structure is correct
   if c, ok := (*d).([]interface{}); ok {
@@ -132,9 +128,8 @@ func decodeCSV(d *interface{}) (e error) {
   return  
 }
 
-// decodeBase64 strips off the base64 encoding, 
-// uncompresses(if necessary), and saves the data into
-// a byte array.
+// decodeBase64 strips off the base64 encoding, uncompresses (if necessary), 
+// and saves the data into a byte array.
 func decodeBase64(d *interface{}, c string) (e error) {
   // make sure the data type is a string
   if _,ok := (*d).(string); !ok {
@@ -179,8 +174,7 @@ func clearHighBits(n uint32) uint32 {
   return n&^(horizontalFlag|verticalFlag|diagonalFlag)
 }
 
-// flipFlags determines if bits 31,30,29 are set and returns a 
-// bool for each bit.
+// flipFlags returns a bool for each bit (31,30,29).
 func flipFlags(n uint32) (h,v,d bool) {
   return (n&horizontalFlag) == horizontalFlag,
   (n&verticalFlag) == verticalFlag,
@@ -197,7 +191,8 @@ func compressBytes(b []byte) uint32 {
   return binary.LittleEndian.Uint32(b)
 }
 
-// prcessTemplates 
+// processTemplates determines if there are templates, if so it loads the 
+// template, and applies it to the object.
 func processTemplates(objs *[]object) (e error) {
   // load in the templates
   tmp, er := getTemplates(objs)
@@ -207,7 +202,6 @@ func processTemplates(objs *[]object) (e error) {
   }
   for i := 0; i < len(*objs); i++ {
     o := &(*objs)[i]
-    // if the object is a template
     if o.Template != empty {
       // get the template
       t, loaded := tmp[o.Template]
@@ -225,8 +219,8 @@ func processTemplates(objs *[]object) (e error) {
       // insert new and overridden properties
       to.Properties = overrideProperties(o.Properties, to.Properties)
       // insert overridden points in polygons and polylines
-      to.Polygon  = overridePolyItem(o.Polygon, to.Polygon)
-      to.Polyline = overridePolyItem(o.Polyline, to.Polyline)
+      to.Polygon  = overridePoints(o.Polygon, to.Polygon)
+      to.Polyline = overridePoints(o.Polyline, to.Polyline)
       // assign the tileset the object references
       (*o).Source = t.Tileset.Source
       // place the fully constructed object into the set of objects
@@ -236,6 +230,8 @@ func processTemplates(objs *[]object) (e error) {
   return
 }
 
+// processTileObjects checks for objects that are from a tileset and extracts 
+// the gid and flip flags of the tile and saves them to the object. 
 func processTileObjects(objs *[]object) {
   for i := 0; i < len(*objs); i++ {
     o := &(*objs)[i]
@@ -253,8 +249,8 @@ func processTileObjects(objs *[]object) {
   }
 }
 
-// processTilesets determines if a tileset needs to be imported
-// from an external tileset file.
+// processTilesets determines if a tileset needs to be imported from an 
+// external tileset file.
 func processTilesets(s *[]tileset) (e error) {
   for i := 0; i < len(*s); i++ {
     ts := &(*s)[i]
@@ -277,19 +273,18 @@ func processTilesets(s *[]tileset) (e error) {
   return
 }
 
+// copyFields copies the fields of one structure over to another. It does not
+// copy slices or structure however.
 func copyFields(src, dst *reflect.Value) (e error) {
   // verify that both are of type struct
   if e = checkStruct(*src, *dst); e != nil {
     return
   }
-
   for i := 0; i < src.NumField(); i++ {
     // get the src field name and value
     n, v := src.Type().Field(i).Name, src.Field(i)
-        
     // get the dst field 
     f := dst.FieldByName(n)
-    
     // if the field exists and it can be assigned a value
     if f.IsValid() && f.CanSet() {
       // assign the field a value based on its type
@@ -314,20 +309,27 @@ func copyFields(src, dst *reflect.Value) (e error) {
   return
 }
 
+// checkStruct verifies if both the source an destination reflect values are of
+// the type struct.
 func checkStruct(src, dst reflect.Value) (e error) {
   if src.Kind() != reflect.Struct && dst.Kind() != reflect.Struct {
-    // src and/or dst values are not structs
+    // src and dst values are not structs
     return reflectionBothWrong
   }
   if src.Kind() != reflect.Struct {
+    // src value is not a struct 
     return reflectionSrcWrong
   }
   if dst.Kind() != reflect.Struct {
+    // dst value is not a struct
     return reflectionDstWrong
   }
   return
 }
 
+
+// overrideProperties combines the overridden properties of a template and 
+// object.  
 func overrideProperties(o, n []property) []property {
   for i := 0; i < len(o); i++ {
     present := false
@@ -346,16 +348,17 @@ func overrideProperties(o, n []property) []property {
   return n
 }
 
-func overridePolyItem(o, n []point) []point {
-  if (len(o) > 0) {
+// overridePoints determines if there are points for polygons and ploylines 
+// that need to be overridden and handles them accordingly.
+func overridePoints(o, n []point) []point {
+  if len(o) > 0 {
     n = o
   }
   return n
 }
 
-// translatePoints adjusts the coordinates of polygons and
-// polylines from being relative coordinates to being global
-// coordinates.
+// translatePoints adjusts the coordinates of polygons and polylines from being
+// relative coordinates to being global coordinates.
 func translatePoints(objs *[]object) {
   for i := 0; i < len(*(objs)); i++ {
     o := &(*objs)[i]

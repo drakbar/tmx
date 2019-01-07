@@ -77,8 +77,8 @@ func (m *tilemap) processLayers(ls *[]layer) (e error) {
   return
 }
 
-// processLayer determines where the tile data is stored in the map
-// and sends it out for processing.
+// processLayer determines where the tile data is stored in the map and sends 
+// it out for processing.
 func (m *tilemap) processLayer(l *layer) (e error) {
   if m.Infinite {
     // tile data is in the chunks
@@ -122,8 +122,8 @@ func (m *tilemap) processTileData(d *interface{}, l layer) (e error) {
   return m.extractTileData(d)      
 }
 
-// extractTileData extracts and correlates information about each
-// tile and repackages it for consumption.
+// extractTileData extracts and correlates information about each tile and 
+// repackages it for consumption.
 func (m *tilemap) extractTileData(d *interface{}) (e error) {
   // make sure the data is a byte array
   if b, ok := (*d).([]byte); ok {
