@@ -236,7 +236,7 @@ func processTemplates(objs *[]object) (e error) {
       // insert overridden points in polygons and polylines
       to.Polygon  = overridePoints(o.Polygon, to.Polygon)
       to.Polyline = overridePoints(o.Polyline, to.Polyline)
-      // assign the tileset the object references
+      // assign the tileset to the object reference
       (*o).Source = t.Tileset.Source
       // place the fully constructed object into the set of objects
       *o = to
