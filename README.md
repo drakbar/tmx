@@ -2,7 +2,7 @@
 Parses json formatted Tiled maps.
 
 ### Example
-```
+```go
 package main
 
 import (
