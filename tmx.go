@@ -1,10 +1,13 @@
 package tmx
 
 import (
+  "os"
   "io"
   "reflect"
   "errors"
   "bytes"
+  "path"
+  "path/filepath"
   "encoding/json"
   "encoding/base64"
   "encoding/binary"
@@ -46,9 +49,16 @@ var (
   templateNotLoaded      = errors.New("the template wasn't loaded")
 )
 
+var mapDirectory string
+
 // LoadTileMap reads in a tilemap from disk, sends the data out to be 
 // processed, and finally returns a tilemap.
 func LoadTileMap(fp string) (m tilemap, e error) {
+  // get path to the map directory so relative paths can be resolved from there
+  if pwd, e := os.Getwd(); e == nil {
+    mapDirectory = filepath.FromSlash(path.Join(pwd, fp))
+  } 
+
   // read in tile map from disk
   var b []byte
   if b, e = ioutil.ReadFile(fp); e == nil {
@@ -69,6 +79,8 @@ func LoadTileMap(fp string) (m tilemap, e error) {
 
 // loadTileset reads in a tileset from disk, and returns a external tileset.
 func loadTileset(fp string) (ts external, e error) {
+  // reslove path
+  fp = path.Join(mapDirectory, fp)
   // read in tile set from disk
   var b []byte
   if b, e = ioutil.ReadFile(fp); e == nil {
@@ -80,6 +92,8 @@ func loadTileset(fp string) (ts external, e error) {
 
 // loadTemplate reads in a template from disk, and returns an external tileset.
 func loadTemplate(fp string) (t template, e error) {
+  // reslove path
+  fp = path.Join(mapDirectory, fp)
   // read in template from disk
   var b []byte
   if b, e = ioutil.ReadFile(fp); e == nil {
