@@ -7,6 +7,7 @@ const (
 )
 
 const (
+  // string constants
   groupLayer     = "group"
   tileLayer      = "tilelayer"
   objectLayer    = "objectgroup"
@@ -45,8 +46,7 @@ func (m *tilemap) processLayers(ls *[]layer) (e error) {
 
     switch l.Type {
     case groupLayer:
-      // a group is a set of layers,
-      // recursively call process layers
+      // a group is a set of layers, recursively call process layers
       e = m.processLayers(&l.Layers)
       if e != nil {
         return
@@ -60,17 +60,15 @@ func (m *tilemap) processLayers(ls *[]layer) (e error) {
       }
     
     case objectLayer:
-      // load in template files and transform
-      // template objects into proper objects
+      // load in template files and transform template objects into proper 
+      // objects
       e = processTemplates(&(l.Objects))
       if e != nil {
         return
       }
-      // find objects that are tiles,
-      // adjust gids, and set flags
+      // find objects that are tiles, adjust gids, and set flags
       processTileObjects(&(l.Objects))
-      // adjust the points of the 
-      // polygons and polylines
+      // adjust the points of the polygons and polylines
       translatePoints(&(l.Objects))
     }
   }
@@ -107,10 +105,12 @@ func (m *tilemap) processTileData(d *interface{}, l layer) (e error) {
   case base_64:
     // encoding is base64
     e = decodeBase64(d, l.Compression)
+  
   case csv:
-    // encoding is csv or xml in both cases
-    // the underlying data structure is identical
+    // encoding is csv or xml in both cases the underlying data structure is 
+    // identical
     e = decodeCSV(d)
+  
   default:
     // encoding is unsupported 
     return unsupportedEncoding
@@ -126,62 +126,58 @@ func (m *tilemap) processTileData(d *interface{}, l layer) (e error) {
 // repackages it for consumption.
 func (m *tilemap) extractTileData(d *interface{}) (e error) {
   // make sure the data is a byte array
-  if b, ok := (*d).([]byte); ok {
-    // make sure there is enough data for every tile
-    if m.Infinite && len(b) != infiniteChunkSize {
-      return dataSizeMismatch
-    }
-    if !m.Infinite && len(b) != (m.Width * m.Height * numBytes) {
-      return dataSizeMismatch
-    }
-
-    var data []*Tile 
-    for i := 0; i < len(b); i += numBytes {
-      // shift the bytes back into a variable
-      n := compressBytes(b[i:])
-      
-      if n == 0 {
-        // there isn't a tile at this location
-        data = append(data, nilTile)
-        continue
-      }
-      
-      // clear the high bits from the gid
-      // and get the flip flags
-      gid   := clearHighBits(n)
-      h,v,d := flipFlags(n)
-      
-      // verify that the gid is a valid id 
-      // and add it to the data container
-      verified := false
-      for j := 0; j < len(m.Tilesets); j++ {
-        t := &m.Tilesets[j]
-
-        // if the global id is in this tileset
-        if int(gid) >= t.Firstgid && int(gid) <= (t.Firstgid + t.Tilecount) - 1 {
-          // add the tile into the container
-          data = append(data, &Tile{ 
-            // set the global and local ids
-            gid: gid, lid: localId(gid, t.Firstgid),
-            // set pointer to the tileset that this gid belongs to
-            tileset: t,
-            // set flip flags
-            horizontialFlip: h, verticalFlip: v, diagonalFlip: d,
-            nil: false })
-          verified = true
-          break;
-        }
-      }
-
-      if !verified {
-        // could not verify the global id
-        return badGlobalId
-      }
-    }
-    // reset the data container
-    *d = data
-  } else {
+  b, ok := (*d).([]byte)
+  if !ok {
     return highBitDataMismatch
   }
+  // make sure there is enough data for every tile
+  if m.Infinite && len(b) != infiniteChunkSize {
+    return dataSizeMismatch
+  }
+  if !m.Infinite && len(b) != (m.Width * m.Height * numBytes) {
+    return dataSizeMismatch
+  }
+
+  var data []*Tile 
+  for i := 0; i < len(b); i += numBytes {
+    // shift the bytes back into a variable
+    n := compressBytes(b[i:])
+    if n == 0 {
+      // there isn't a tile at this location
+      data = append(data, nilTile)
+      continue
+    }
+    
+    // clear the high bits from the gid and get the flip flags
+    gid   := clearHighBits(n)
+    h,v,d := flipFlags(n)
+    
+    // verify that the gid is a valid id and add it to the data container
+    verified := false
+    for j := 0; j < len(m.Tilesets); j++ {
+      t := &m.Tilesets[j]
+      lastId := (t.Firstgid + t.Tilecount) - 1
+      // if the global id is in this tileset
+      if int(gid) >= t.Firstgid && int(gid) <= lastId {
+        // add the tile into the container
+        data = append(data, &Tile{ 
+          // set the global and local ids
+          gid: gid, lid: localId(gid, t.Firstgid),
+          // set pointer to the tileset that this gid belongs to
+          tileset: t,
+          // set flip flags
+          horizontialFlip: h, verticalFlip: v, diagonalFlip: d,
+          nil: false })
+        verified = true
+        break;
+      }
+    }
+    if !verified {
+      // could not verify the global id
+      return badGlobalId
+    }
+  }
+  // reset the data container
+  *d = data
   return
 }

@@ -37,7 +37,7 @@ var (
   unsupportedCompression = errors.New("the compression type is unsupported")
   dataStringMismatch     = errors.New("the data is not of type string")
   dataSizeMismatch       = errors.New("tile data and map size do not match")
-  csvDataMismatch        = errors.New("CSV data structure incorrect")
+  csvDataMismatch        = errors.New("csv data structure incorrect")
   highBitDataMismatch    = errors.New("tile data is not a byte array")
   reflectionBothWrong    = errors.New("both the src and dst are not a structures")
   reflectionSrcWrong     = errors.New("the src is not a structures")
@@ -54,13 +54,11 @@ func LoadTileMap(fp string) (m tilemap, e error) {
   if b, e = ioutil.ReadFile(fp); e == nil {
     // store the json data into tilemap
     if e = json.Unmarshal(b, &m); e == nil {
-      // determine if there are external tilesets
-      // and load them if necessary
+      // determine if there are external tilesets and load them if necessary
       if e = processTilesets(&m.Tilesets); e != nil {
         return
       }
-      // decode and if necessary decompress 
-      // all layer data to a workable format
+      // decode and if necessary decompress all layer data to a workable format
       if e = m.processLayers(&m.Layers); e != nil {
         return
       }
@@ -115,8 +113,8 @@ func decodeCSV(d *interface{}) (e error) {
   if c, ok := (*d).([]interface{}); ok {
     // make a byte array that can hold all four bytes per tile
     b := make([]byte, len(c)*numBytes)
-    // break each tile id into the appropriate number of bytes 
-    // and store them in the byte array
+    // break each tile id into the appropriate number of bytes and store them 
+    // in the byte array
     for i,v := range c {
       binary.LittleEndian.PutUint32(b[i*numBytes:], uint32(v.(float64)))
     }
@@ -154,13 +152,16 @@ func decodeBase64(d *interface{}, c string) (e error) {
     if e != nil {
       return
     }
+
   case zLib:
     dec, e = zlib.NewReader(enc)
     if e != nil {
       return
     }
+
   case uncompressed:
     dec = enc
+
   default:
     return unsupportedCompression
   }
@@ -261,8 +262,8 @@ func processTilesets(s *[]tileset) (e error) {
       if ex, e = loadTileset(ts.Source); e != nil {
         return
       }
-      // get the reflect value of the external tileset and the
-      // corresponding tileset
+      // get the reflect value of the external tileset and the corresponding 
+      // tileset
       src, dst := reflect.ValueOf(ex), reflect.ValueOf(ts).Elem()
       // copy the fields of the src into the dst
       if e = copyFields(&src, &dst); e != nil {
