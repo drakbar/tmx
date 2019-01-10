@@ -33,20 +33,41 @@ const (
 )
 
 var (
-  // runtime errors
-  nilDataPtr             = errors.New("data pointer is nil")
-  missingData            = errors.New("base64 data is an empty string")
+  // data quantity errors
+  missingData      = errors.New("base64 data is an empty string")
+  dataSizeMismatch = errors.New("tile data and map size do not match")
+)
+
+var (
+  // data loading errors
+  templateNotLoaded = errors.New("the template wasn't loaded")
+  nilDataPtr        = errors.New("data pointer is nil")
+)
+
+var (
+  // data formatting errors
   unsupportedEncoding    = errors.New("the encoding type is unsupported")
   unsupportedCompression = errors.New("the compression type is unsupported")
-  dataStringMismatch     = errors.New("the data is not of type string")
-  dataSizeMismatch       = errors.New("tile data and map size do not match")
-  csvDataMismatch        = errors.New("csv data structure incorrect")
-  highBitDataMismatch    = errors.New("tile data is not a byte array")
-  reflectionBothWrong    = errors.New("both the src and dst are not a structures")
-  reflectionSrcWrong     = errors.New("the src is not a structures")
-  reflectionDstWrong     = errors.New("the dst is not a structures")
-  badGlobalId            = errors.New("global id could not be found in any tile set")
-  templateNotLoaded      = errors.New("the template wasn't loaded")
+)
+
+var (
+  // data type errors
+  dataStringMismatch  = errors.New("the data is not of type string")
+  csvDataMismatch     = errors.New("csv data structure incorrect")
+  highBitDataMismatch = errors.New("tile data is not a byte array")
+)
+  
+var (
+  // reflection errors
+  reflectionBothWrong = errors.New("both the src and dst are not a structures")
+  reflectionSrcWrong  = errors.New("the src is not a structures")
+  reflectionDstWrong  = errors.New("the dst is not a structures")
+)
+
+var (
+  // invalid data errors
+  badGlobalId       = errors.New("global id could not be found in any tileset")
+  noMatchingTileset = errors.New("template does not match a valid tileset")
 )
 
 var mapDirectory string
@@ -56,7 +77,8 @@ var mapDirectory string
 func LoadTileMap(fp string) (m tilemap, e error) {
   // get path to the map directory so relative paths can be resolved from there
   if pwd, e := os.Getwd(); e == nil {
-    mapDirectory = filepath.FromSlash(path.Join(pwd, fp))
+    dir,_ := filepath.Split(fp)
+    mapDirectory = filepath.FromSlash(path.Join(pwd, dir))
   } 
 
   // read in tile map from disk
@@ -80,7 +102,7 @@ func LoadTileMap(fp string) (m tilemap, e error) {
 // loadTileset reads in a tileset from disk, and returns a external tileset.
 func loadTileset(fp string) (ts external, e error) {
   // reslove path
-  fp = path.Join(mapDirectory, fp)
+  fp = filepath.FromSlash(path.Join(mapDirectory, fp))
   // read in tile set from disk
   var b []byte
   if b, e = ioutil.ReadFile(fp); e == nil {
@@ -93,7 +115,7 @@ func loadTileset(fp string) (ts external, e error) {
 // loadTemplate reads in a template from disk, and returns an external tileset.
 func loadTemplate(fp string) (t template, e error) {
   // reslove path
-  fp = path.Join(mapDirectory, fp)
+  fp = filepath.FromSlash(path.Join(mapDirectory, fp))
   // read in template from disk
   var b []byte
   if b, e = ioutil.ReadFile(fp); e == nil {
@@ -236,32 +258,13 @@ func processTemplates(objs *[]object) (e error) {
       // insert overridden points in polygons and polylines
       to.Polygon  = overridePoints(o.Polygon, to.Polygon)
       to.Polyline = overridePoints(o.Polyline, to.Polyline)
-      // assign the tileset to the object reference
-      (*o).Source = t.Tileset.Source
       // place the fully constructed object into the set of objects
       *o = to
+      // assign the tileset to the object reference
+      (*o).Source = t.Tileset.Source
     }
   }
   return
-}
-
-// processTileObjects checks for objects that are from a tileset and extracts 
-// the gid and flip flags of the tile and saves them to the object. 
-func processTileObjects(objs *[]object) {
-  for i := 0; i < len(*objs); i++ {
-    o := &(*objs)[i]
-
-    if o.Gid != 0 {
-      // get flags
-      h,v,d := flipFlags(uint32(o.Gid))
-      // set flags
-      (*o).HorizontialFlip = h
-      (*o).VerticalFlip    = v
-      (*o).DiagonalFlip    = d
-      // strip out the flags
-      (*o).Gid = int(clearHighBits(uint32(o.Gid)))
-    }
-  }
 }
 
 // processTilesets determines if a tileset needs to be imported from an 
@@ -390,4 +393,12 @@ func translatePoints(objs *[]object) {
       p.Y += o.Y
     }
   }
+}
+
+// matchTilesetName returns whether the names of the tilesets are equal by 
+// stripping off the file path.
+func matchTilesetName(s1, s2 string) bool {
+  _, f1 := filepath.Split(s1)
+  _, f2 := filepath.Split(s2)
+  return f1 == f2
 }

@@ -16,25 +16,25 @@ const (
 )
 
 type tilemap struct {
-  Version         float32    `json:"version"`         // the json format version
-  Tiledversion    string     `json:"tiledversion"`    // the tiled version used to save the file
-  Type            string     `json:"type"`            // map (since 1.0)
-  Backgroundcolor string     `json:"backgroundcolor"` // hex-formatted color (#RRGGBB or #AARRGGBB)
-  Orientation     string     `json:"orientation"`     // orthogonal, isometric, staggered or hexagonal
-  Renderorder     string     `json:"renderorder"`     // rendering direction (orthogonal maps only)
-  StaggerAxis     string     `json:"staggeraxis"`     // x or y (staggered / hexagonal maps only)
-  StaggerIndex    string     `json:"staggerindex"`    // odd or even (staggered / hexagonal maps only)
+  Version         float32    `json:"version"`         // json format version
+  Tiledversion    string     `json:"tiledversion"`    // tiled version
+  Type            string     `json:"type"`            // "map"
+  Backgroundcolor string     `json:"backgroundcolor"` // hex color (#AARRGGBB)
+  Orientation     string     `json:"orientation"`     // map type
+  Renderorder     string     `json:"renderorder"`     // rendering direction
+  StaggerAxis     string     `json:"staggeraxis"`     // x or y 
+  StaggerIndex    string     `json:"staggerindex"`    // odd or even 
   Width           int        `json:"width"`           // number of tile columns
   Height          int        `json:"height"`          // number of tile rows
   Tilewidth       int        `json:"tilewidth"`       // map grid width
   Tileheight      int        `json:"tileheight"`      // map grid height
-  HexSideLength   int        `json:"hexsidelength"`   // length of the side of a hex tile in pixels
-  Nextobjectid    int        `json:"nextobjectid"`    // auto-increments for each placed object
-  NextLayerId     int        `json:"nextlayerid"`     // auto-increments for each layer
-  Infinite        bool       `json:"infinite"`        // whether the map has infinite dimensions
-  Layers          []layer    `json:"layers"`          // array of Layers
-  Tilesets        []tileset  `json:"tilesets"`        // array of tilesets
-  Properties      []property `json:"properties"`      // a list of properties (name, value, type)
+  HexSideLength   int        `json:"hexsidelength"`   // side length of hex
+  Nextobjectid    int        `json:"nextobjectid"`    // unique for each object
+  NextLayerId     int        `json:"nextlayerid"`     // unique for each layer
+  Infinite        bool       `json:"infinite"`        // is map infinite
+  Layers          []layer    `json:"layers"`          // layers
+  Tilesets        []tileset  `json:"tilesets"`        // tilesets
+  Properties      []property `json:"properties"`      // a list of properties
 }
 
 
@@ -54,7 +54,7 @@ func (m *tilemap) processLayers(ls *[]layer) (e error) {
     
     case tileLayer:
       // process the tile data
-      e = m.processLayer(l)
+      e = m.processLayer(l) 
       if e != nil {
         return
       }
@@ -67,7 +67,10 @@ func (m *tilemap) processLayers(ls *[]layer) (e error) {
         return
       }
       // find objects that are tiles, adjust gids, and set flags
-      processTileObjects(&(l.Objects))
+      e = m.processTileObjects(&(l.Objects))
+      if e != nil {
+        return
+      }
       // adjust the points of the polygons and polylines
       translatePoints(&(l.Objects))
     }
@@ -152,32 +155,77 @@ func (m *tilemap) extractTileData(d *interface{}) (e error) {
     gid   := clearHighBits(n)
     h,v,d := flipFlags(n)
     
-    // verify that the gid is a valid id and add it to the data container
-    verified := false
-    for j := 0; j < len(m.Tilesets); j++ {
-      t := &m.Tilesets[j]
-      lastId := (t.Firstgid + t.Tilecount) - 1
-      // if the global id is in this tileset
-      if int(gid) >= t.Firstgid && int(gid) <= lastId {
-        // add the tile into the container
-        data = append(data, &Tile{ 
-          // set the global and local ids
-          gid: gid, lid: localId(gid, t.Firstgid),
-          // set pointer to the tileset that this gid belongs to
-          tileset: t,
-          // set flip flags
-          horizontialFlip: h, verticalFlip: v, diagonalFlip: d,
-          nil: false })
-        verified = true
-        break;
-      }
+    // verify that the gid is a valid id
+    var t *tileset
+    t, e = m.verifyGid(gid)
+    if e != nil {
+      return
     }
-    if !verified {
-      // could not verify the global id
-      return badGlobalId
-    }
+
+    // add the tile into the container
+    data = append(data, &Tile{ 
+      // set the global and local ids
+      gid: gid, lid: localId(gid, t.Firstgid),
+      // set pointer to the tileset that this gid belongs to
+      tileset: t,
+      // set flip flags
+      horizontialFlip: h, verticalFlip: v, diagonalFlip: d,
+      nil: false })  
   }
   // reset the data container
   *d = data
   return
+}
+
+ // verifyGid confirms a gid is a valid id for a tile in one of the tilesets.
+func (m *tilemap) verifyGid(gid uint32) (t *tileset, e error) {
+  for i := 0; i < len(m.Tilesets); i++ {
+    t := &m.Tilesets[i]
+    lastId := (t.Firstgid + t.Tilecount) - 1
+    // if the global id is in this tileset
+    if int(gid) >= t.Firstgid && int(gid) <= lastId {
+      return t, nil
+    }
+  }
+  return nil, badGlobalId
+}
+
+// processTileObjects checks for objects that are from a tileset and extracts 
+// the gid and flip flags of the tile and saves them to the object. 
+func (m *tilemap) processTileObjects(objs *[]object) (e error) {
+  for i := 0; i < len(*objs); i++ {
+    o := &(*objs)[i]
+
+    if o.Gid != 0 {
+      // get flags
+      h,v,d := flipFlags(uint32(o.Gid))
+      // set flags
+      (*o).HorizontialFlip = h
+      (*o).VerticalFlip    = v
+      (*o).DiagonalFlip    = d
+      // strip out the flags
+      (*o).Gid = int(clearHighBits(uint32(o.Gid)))
+      // verify that there is a matching tileset
+      if e = m.matchTileset(o); e != nil {
+        return
+      }
+    }
+  }
+  return
+}
+
+// matchTileset compares the tileset of a template with the list of loaded
+// tileset to verify that there is a tileset loaded for the template. It sets
+// the local and global ids of the object.
+func (m *tilemap) matchTileset(o *object) (e error) {
+  for i := 0; i < len(m.Tilesets); i++ {
+    t := m.Tilesets[i] 
+    if matchTilesetName(t.Source, o.Source) {
+      (*o).Lid = o.Gid
+      (*o).Gid += (t.Firstgid - 1)
+      _, e = m.verifyGid(uint32(o.Gid))
+      return 
+    } 
+  }
+  return noMatchingTileset
 }
