@@ -37,7 +37,6 @@ type tilemap struct {
   Properties      []property `json:"properties"`      // a list of properties
 }
 
-
 // processLayers determines what data needs processed for a given map.
 func (m *tilemap) processLayers(ls *[]layer) (e error) {
   for i := 0; i < len((*ls)); i++ {
