@@ -166,7 +166,7 @@ func (m *tilemap) extractTileData(d *interface{}) (e error) {
       // set the global and local ids
       gid: gid, lid: localId(gid, t.Firstgid),
       // set pointer to the tileset that this gid belongs to
-      tileset: t,
+      tileset: t.Source,
       // set flip flags
       horizontialFlip: h, verticalFlip: v, diagonalFlip: d,
       nil: false })  
